@@ -1,24 +1,27 @@
 import { NextResponse } from "next/server";
+import postgres from "postgres";
 
 export async function GET() {
   try {
-    // Simulamos datos para ver que este vien la validacion
-    const posts = [
-      {
-        title: "Pureba 2",
-        description: "Este es un post de prueba",
-        author: "Yo"
-      },
-    ];
+    const connectionString =
+      "postgresql://postgres.hbninqtzxwmjeyfgccjr:Pollito14@aws-1-us-east-2.pooler.supabase.com:6543/postgres";
+
+    const sql = postgres(connectionString);
+
+    const title = await sql`SELECT title FROM post`;
+    const description = await sql`SELECT description FROM post`;
+    const author = await sql`SELECT author FROM post`;
 
     return NextResponse.json({
       message: "Posts obtenidos correctamente",
-      posts
+      title,
+      description,
+      author
     });
   } catch (error: any) {
-    console.error("Error al obtener usuarios:", error);
+    console.error("Error al obtener posts:", error.message, error.stack);
     return NextResponse.json(
-      { error: "No se pudieron obtener los usuarios" },
+      { error: error.message || "No se pudieron obtener los posts" },
       { status: 500 }
     );
   }
