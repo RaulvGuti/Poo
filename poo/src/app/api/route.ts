@@ -7,31 +7,50 @@ const connectionString =
 const sql = postgres(connectionString);
 
 // Wspacios para validar
-function validateAndFormatBook(title: any, description: any, author: any) {
+class BookService {
   // Mirar que esto sea string
-  if (typeof title !== "string" || typeof description !== "string" || typeof author !== "string") {
-    throw new Error("El título, la descripción y el autor deben ser textos.");
+  validateAndFormatBook(title: any, description: any, author: any) {
+    if (typeof title !== "string" || typeof description !== "string" || typeof author !== "string") {
+      throw new Error("El título, la descripción y el autor deben ser textos.");
+    }
+
+    // Quita espacios que se vayan demas
+    let cleanTitle = title.trim();
+    let cleanAuthor = author.trim();
+    let cleanDescription = description.trim();
+
+    // Hacer que la letra inicial sea mayuscula si o si
+    cleanTitle = cleanTitle.charAt(0).toUpperCase() + cleanTitle.slice(1);
+    cleanAuthor = cleanAuthor.charAt(0).toUpperCase() + cleanAuthor.slice(1);
+
+    // Poner un punto final si o si
+    if (!cleanTitle.endsWith(".")) cleanTitle += ".";
+    if (!cleanAuthor.endsWith(".")) cleanAuthor += ".";
+
+    return { title: cleanTitle, description: cleanDescription, author: cleanAuthor };
   }
 
-  // Quita espacios que se vayan demas
-  let cleanTitle = title.trim();
-  let cleanAuthor = author.trim();
-  let cleanDescription = description.trim();
+  // Esto añade auna funcion especifica para seleccionar libros libros
+  async getAllBooks() {
+    return await sql`SELECT title, description, author FROM post`;
+  }
 
-  // Hacer que la letra inicial sea mayuscula si o si
-  cleanTitle = cleanTitle.charAt(0).toUpperCase() + cleanTitle.slice(1);
-  cleanAuthor = cleanAuthor.charAt(0).toUpperCase() + cleanAuthor.slice(1);
-
-  // Poner un punto final si o si
-  if (!cleanTitle.endsWith(".")) cleanTitle += ".";
-  if (!cleanAuthor.endsWith(".")) cleanAuthor += ".";
-
-  return { title: cleanTitle, description: cleanDescription, author: cleanAuthor };
+  // Añade la funciona para incluir un libro
+  async addBook(title: any, description: any, author: any) {
+    const validatedData = this.validateAndFormatBook(title, description, author);
+    await sql`
+      INSERT INTO post (title, description, author)
+      VALUES (${validatedData.title}, ${validatedData.description}, ${validatedData.author})
+    `;
+    return validatedData;
+  }
 }
+
+const bookService = new BookService();
 
 export async function GET() {
   try {
-    const requisitos = await sql`SELECT title, description, author FROM post`;
+    const requisitos = await bookService.getAllBooks();
 
     return NextResponse.json({
       message: "Libros obtenidos correctamente",
@@ -60,15 +79,10 @@ export async function POST(request: NextRequest) {
 
     let validatedData; // Esto se asegura de validaciones (Paso 2 tecnicamente jaja)
     try {
-      validatedData = validateAndFormatBook(title, description, author);
+      validatedData = await bookService.addBook(title, description, author);
     } catch (err: any) {
       return NextResponse.json({ error: err.message }, { status: 422 });
     }
-
-    await sql`
-      INSERT INTO post (title, description, author)
-      VALUES (${validatedData.title}, ${validatedData.description}, ${validatedData.author})
-    `;
 
     return NextResponse.json({
       message: "Libro agregado correctamente",
