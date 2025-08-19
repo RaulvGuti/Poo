@@ -6,10 +6,20 @@ const connectionString =
   "postgresql://postgres.hbninqtzxwmjeyfgccjr:Pollito14@aws-1-us-east-2.pooler.supabase.com:6543/postgres";
 const sql = postgres(connectionString);
 
-// Wspacios para validar
-class BookService {
-  // Mirar que esto sea string
-  validateAndFormatBook(title: any, description: any, author: any) {
+// Creamos el constructor del libro
+class Book {
+  title: string;
+  description: string;
+  author: string;
+
+  private constructor(title: string, description: string, author: string) {
+    this.title = title;
+    this.description = description;
+    this.author = author;
+  }
+
+  // Se asegura que sera Varchar y reinicia
+  static create(title: any, description: any, author: any) {
     if (typeof title !== "string" || typeof description !== "string" || typeof author !== "string") {
       throw new Error("El título, la descripción y el autor deben ser textos.");
     }
@@ -27,22 +37,24 @@ class BookService {
     if (!cleanTitle.endsWith(".")) cleanTitle += ".";
     if (!cleanAuthor.endsWith(".")) cleanAuthor += ".";
 
-    return { title: cleanTitle, description: cleanDescription, author: cleanAuthor };
+    return new Book(cleanTitle, cleanDescription, cleanAuthor);
   }
+}
 
-  // Esto añade auna funcion especifica para seleccionar libros libros
+// Esto añade auna funcion especifica para seleccionar libros libros
+class BookService {
   async getAllBooks() {
-    return await sql`SELECT title, description, author FROM post`;
+    const rows = await sql`SELECT title, description, author FROM post`;
+    return rows.map((row: any) => Book.create(row.title, row.description, row.author));
   }
 
   // Añade la funciona para incluir un libro
-  async addBook(title: any, description: any, author: any) {
-    const validatedData = this.validateAndFormatBook(title, description, author);
+  async addBook(book: Book) {
     await sql`
       INSERT INTO post (title, description, author)
-      VALUES (${validatedData.title}, ${validatedData.description}, ${validatedData.author})
+      VALUES (${book.title}, ${book.description}, ${book.author})
     `;
-    return validatedData;
+    return book;
   }
 }
 
@@ -77,16 +89,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let validatedData; // Esto se asegura de validaciones (Paso 2 tecnicamente jaja)
+    let book; // Esto se asegura de validaciones (Paso 2 tecnicamente jaja)
     try {
-      validatedData = await bookService.addBook(title, description, author);
+      book = Book.create(title, description, author);
     } catch (err: any) {
       return NextResponse.json({ error: err.message }, { status: 422 });
     }
 
+    await bookService.addBook(book);
+
     return NextResponse.json({
       message: "Libro agregado correctamente",
-      nuevoPost: validatedData,
+      nuevoPost: book,
     });
   } catch (error: any) {
     console.error("Error al crear el libro:", error.message);
