@@ -41,49 +41,40 @@ class Book {
   }
 }
 
-// Nuevo repositorio para reducir acoplamiento directo con la base de datos
-class BookRepository {
-  private db: any;
-  constructor(db: any) {
-    this.db = db;
-  }
-
-  async findAll() {
-    const rows = await this.db`SELECT title, description, author FROM post`;
-    return rows;
-  }
-
-  async insert(book: Book) {
-    await this.db`
-      INSERT INTO post (title, description, author)
-      VALUES (${book.title}, ${book.description}, ${book.author})
-    `;
-  }
-}
-
-// Esto añade a una funcion especifica para seleccionar libros libros
+// Esto añade auna funcion especifica para seleccionar libros libros
 class BookService {
-  private repository: BookRepository;
-
-  constructor(repository: BookRepository) {
-    this.repository = repository;
-  }
-
   async getAllBooks() {
-    const rows = await this.repository.findAll();
+    const rows = await sql`SELECT title, description, author FROM post`;
     return rows.map((row: any) => Book.create(row.title, row.description, row.author));
   }
 
   // Añade la funciona para incluir un libro
   async addBook(book: Book) {
-    await this.repository.insert(book);
+    await sql`
+      INSERT INTO post (title, description, author)
+      VALUES (${book.title}, ${book.description}, ${book.author})
+    `;
+    return book;
+  }
+
+  // Nueva función para editar un libro
+  async updateBook(id: number, book: Book) {
+    const result = await sql`
+      UPDATE post
+      SET title = ${book.title},
+          description = ${book.description},
+          author = ${book.author}
+      WHERE id = ${id}
+      RETURNING id
+    `;
+    if (result.count === 0) {
+      throw new Error("No se encontró el libro a actualizar.");
+    }
     return book;
   }
 }
 
-// Paso 9 que me equivoque Pense que era validacion de datos y no es el ver post lo siento
-const bookRepository = new BookRepository(sql);
-const bookService = new BookService(bookRepository);
+const bookService = new BookService();
 
 export async function GET() {
   try {
@@ -131,6 +122,41 @@ export async function POST(request: NextRequest) {
     console.error("Error al crear el libro:", error.message);
     return NextResponse.json(
       { error: "Ocurrio un problema al guardar tu libro" },
+      { status: 500 }
+    );
+  }
+}
+
+// Nuevo handler para editar libro
+export async function PUT(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { id, title, description, author } = body;
+
+    if (!id || !title || !description || !author) {
+      return NextResponse.json(
+        { error: "Por favor envía id, título, descripción y autor" },
+        { status: 422 }
+      );
+    }
+
+    let book;
+    try {
+      book = Book.create(title, description, author);
+    } catch (err: any) {
+      return NextResponse.json({ error: err.message }, { status: 422 });
+    }
+
+    await bookService.updateBook(Number(id), book);
+
+    return NextResponse.json({
+      message: "Libro actualizado correctamente",
+      libroActualizado: book,
+    });
+  } catch (error: any) {
+    console.error("Error al actualizar el libro:", error.message);
+    return NextResponse.json(
+      { error: "Ocurrio un problema al actualizar tu libro" },
       { status: 500 }
     );
   }
