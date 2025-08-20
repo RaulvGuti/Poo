@@ -41,24 +41,48 @@ class Book {
   }
 }
 
-// Esto añade auna funcion especifica para seleccionar libros libros
+// Nuevo repositorio para reducir acoplamiento directo con la base de datos
+class BookRepository {
+  private db: any;
+  constructor(db: any) {
+    this.db = db;
+  }
+
+  async findAll() {
+    const rows = await this.db`SELECT title, description, author FROM post`;
+    return rows;
+  }
+
+  async insert(book: Book) {
+    await this.db`
+      INSERT INTO post (title, description, author)
+      VALUES (${book.title}, ${book.description}, ${book.author})
+    `;
+  }
+}
+
+// Esto añade a una funcion especifica para seleccionar libros libros
 class BookService {
+  private repository: BookRepository;
+
+  constructor(repository: BookRepository) {
+    this.repository = repository;
+  }
+
   async getAllBooks() {
-    const rows = await sql`SELECT title, description, author FROM post`;
+    const rows = await this.repository.findAll();
     return rows.map((row: any) => Book.create(row.title, row.description, row.author));
   }
 
   // Añade la funciona para incluir un libro
   async addBook(book: Book) {
-    await sql`
-      INSERT INTO post (title, description, author)
-      VALUES (${book.title}, ${book.description}, ${book.author})
-    `;
+    await this.repository.insert(book);
     return book;
   }
 }
 
-const bookService = new BookService();
+const bookRepository = new BookRepository(sql);
+const bookService = new BookService(bookRepository);
 
 export async function GET() {
   try {
