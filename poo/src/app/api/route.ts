@@ -81,6 +81,7 @@ class BookService {
   }
 }
 
+// Paso 9 que me equivoque Pense que era validacion de datos y no es el ver post lo siento
 const bookRepository = new BookRepository(sql);
 const bookService = new BookService(bookRepository);
 
